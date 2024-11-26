@@ -1,6 +1,6 @@
 # Circuit Python Code for Smart Fan Unit
 
-Tested with Adafruit CircuitPython 8.2.7
+Tested with Adafruit CircuitPython 9
 
 1. Connect to USB and boot the Raspberry in UF2 Bootloader v3.0 mode (power on with BOOT button pressed)
 2. Download firmware from [circuitpython.org](https://circuitpython.org/board/raspberry_pi_pico/) for the RPI Pico
