@@ -5,41 +5,33 @@ from adafruit_emc2101 import EMC2101
 import digitalio
 import neopixel
 
-
-g,r,b = 0,0,0
-mintemp = 20 # Temperature Boundaries. Closer to this is green. LEDs
-maxtemp = 35 # Temperature Boundaries. Closer to this is red. LEDs
+MIN_TEMP = 20 # Temperature Boundaries. Closer to this is green. LEDs
+MAX_TEMP = 35 # Temperature Boundaries. Closer to this is red. LEDs
 LEDBRIGHTNESS = 0.6 # Yes, you can change the brightness here
 BAUD_RATE = 115200 # The UART connection speed
-TIMEOUT = 0 # number of time before timeout
+TIMEOUT = 0 # Number of time before timeout
+TEMP_OFFSET = 0 # degrees C Correction for internal_temperature to match external_temperature.
 
-led = digitalio.DigitalInOut(board.LED)
-led.direction = digitalio.Direction.OUTPUT
-pixels = neopixel.NeoPixel(board.GP15, 2, brightness=LEDBRIGHTNESS, auto_write=False, pixel_order="GRB")
 
-button = digitalio.DigitalInOut(board.GP12) # Button on the back of the fan unit
+LED = digitalio.DigitalInOut(board.LED)
+LED.direction = digitalio.Direction.OUTPUT
 
-fan_power = digitalio.DigitalInOut(board.GP16) # The fan power control is on GPIO16 you can turn it off/on.
-fan_power.direction = digitalio.Direction.OUTPUT
-fan_power.value = True # Turn on Fan
+PIXELS = neopixel.NeoPixel(board.GP15, 2, brightness=LEDBRIGHTNESS, auto_write=False, pixel_order="GRB")
+
+BUTTON = digitalio.DigitalInOut(board.GP12) # Button on the back of the fan unit
+
+FAN_POWER = digitalio.DigitalInOut(board.GP16) # The fan power control is on GPIO16 you can turn it off/on.
+FAN_POWER.direction = digitalio.Direction.OUTPUT
+FAN_POWER.value = True # Turn on Fan
 
 UART0 = busio.UART(board.GP0, board.GP1, baudrate=BAUD_RATE, timeout=TIMEOUT) 
 UART1 = busio.UART(board.GP8, board.GP9, baudrate=BAUD_RATE, timeout=TIMEOUT)
 I2C = busio.I2C(board.GP5, board.GP4) 
 emc = EMC2101(I2C)
 
-
-def show(percent, pixel):
-    a = int(round((510 / 100) * percent))
-    if a > 255:
-        r = 255
-        g = 510 - a
-    else:
-        r = a
-        g = 255
-    pixels[pixel] = (g, r, b)
-    pixels.show()
-#    return print('showed', a, 'on', pixel)
+# Apply offset in function
+def getInternalWithOffset():
+    return emc.internal_temperature + TEMP_OFFSET
 
 # Set Fan Speed 0 < 100 and Print text 
 def setFanSpeed(speed:int):
@@ -55,31 +47,33 @@ def setFanSpeed(speed:int):
 
 # Compare to see if the external or internal temperature are in the range 
 def checkTempInRange(low:int, high:int):
-    return low <= emc.external_temperature < high or low <= emc.internal_temperature < high
+    return low <= emc.external_temperature < high or low <= getInternalWithOffset() < high
+
+# color of digital LEDs depending on the temperature readings
+def smoothLED(temp:int|float, position:int):
+    # Smoothly changes the color within the set values
+    if MIN_TEMP <= temp <= MAX_TEMP:
+        temp = temp - MIN_TEMP
+        max_min_delta = MAX_TEMP - MIN_TEMP
+        c = int(round((temp / max_min_delta) * 100))
+        a = int(round((510 / 100) * c))
+        if a > 255:
+            red = 255
+            green = 510 - a
+        else:
+            red = a
+            green = 255
+        PIXELS[position] = (green, red, 0)
+    elif temp < MIN_TEMP:
+        PIXELS[position] = (255, 0, 0)
+    else:
+        PIXELS[position] = (0, 255, 0)
 
 while True:
-    
-    temp = emc.external_temperature        
-    if mintemp <= temp <= maxtemp:
-        temp = temp - mintemp
-        mtemp = maxtemp - mintemp
-        c = int(round((temp / mtemp) * 100))
-        show(c, 0)
-    elif temp < mintemp:
-        pixels[0] = (255, 0, 0)
-    else:
-        pixels[0] = (0, 255, 0)
-     
-    temp = emc.internal_temperature + 2
-    if mintemp <= temp <= maxtemp:
-        temp = temp - mintemp
-        mtemp = maxtemp - mintemp
-        c = int(round((temp / mtemp) * 100))
-        show(c, 1)
-    elif temp < mintemp:
-        pixels[1] = (255, 0, 0)
-    else:
-        pixels[1] = (0, 255, 0)
+    # Change LED color based on Temp
+    smoothLED(emc.external_temperature, 0)
+    smoothLED(getInternalWithOffset(), 1)
+    PIXELS.show()
     time.sleep(0.1)
     
     dataA = UART0.read(8)
@@ -102,18 +96,22 @@ while True:
 #         dataA = dataA.decode()
 #     if dataB is not None:
 #         dataB = dataB.decode()
-    if button.value:
+    if BUTTON.value:
         print("Button is not pressed")
+        LED.value = False
+
     else:
         print("Button pressed")
+        LED.value = True
+
         
     print("From Blade A", dataA)
     print("From Blade B", dataB)
     
-    print("Internal temperature:", emc.internal_temperature, "C")
-    print("External temperature:", emc.external_temperature, "C")
-    BladeA_uart_info = bytes(str("Internal temperature: " + str(emc.internal_temperature) + " C" + "\r\n"),'UTF-8')
-    BladeB_uart_info = bytes(str("External temperature: " + str(emc.external_temperature) + " C" + "\r\n"),'UTF-8')
+    print("Internal temperature(Port A):", getInternalWithOffset(), "C")
+    print("External temperature(Port B):", emc.external_temperature, "C")
+    BladeA_uart_info = bytes(str("Internal temperature(Port A): " + str(getInternalWithOffset()) + " C" + "\r\n"),'UTF-8')
+    BladeB_uart_info = bytes(str("External temperature(Port B): " + str(emc.external_temperature) + " C" + "\r\n"),'UTF-8')
     #BladeA_uart_info = bytes(str(str(emc.external_temperature) + " C" + "\r\n"),"ascii")
     #BladeB_uart_info = bytes(str(str(emc.internal_temperature) + " C" + "\r\n"),"ascii")
     #print(BladeA_uart_info + BladeB_uart_info)
@@ -133,14 +131,14 @@ while True:
         continue   
     if (dataA is not 'Auto' and dataB is 'Auto') or (dataA is 'Auto' and dataB is not 'Auto'):  #xor in a hurry
         if dataA is not 'Auto':
-            led.value = True
+            LED.value = True
             print("Set the speed as Blade A asks:", dataA, " %")
             emc.manual_fan_speed = int(dataA)
             time.sleep(1)
             print("Fan speed", emc.fan_speed, "RPM")
             time.sleep(1)
         if dataB is not 'Auto':
-            led.value = True
+            LED.value = True
             print("Set the speed as Blade B asks:", dataB, " %")
             emc.manual_fan_speed = int(dataB)
             time.sleep(2)
@@ -151,8 +149,7 @@ while True:
         
     else:
         # If temp exceeds 40C turn fan on 100%
-        if 40 <= emc.external_temperature or 40 <= emc.internal_temperature:
-            led.value = True
+        if 40 <= emc.external_temperature or 40 <= getInternalWithOffset():
             setFanSpeed(100)
 
         # If temp between 35C to 40C set fan speed to 70% 
@@ -161,22 +158,18 @@ while True:
 
         # If temp between 33C to 35C set fan speed to 70% 
         elif checkTempInRange(33,35):
-            led.value = True
             setFanSpeed(60)
 
         # If temp between 13C to 33C set fan speed to 70% 
         elif checkTempInRange(31,33):
-            led.value = True
             setFanSpeed(40)
 
         # If temp between 29C to 31C set fan speed to 70% 
         elif checkTempInRange(29,31):
-            # led.value = True
             setFanSpeed(30)
 
         # If temp lower than 29C set fan speed to 10% 
         else:
-            # led.value = True
             setFanSpeed(10)
 
     print("")
