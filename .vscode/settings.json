@@ -1,8 +1,9 @@
 {
     "python.analysis.extraPaths": [
-        "c:\\Users\\johnw\\.vscode\\extensions\\wmerkens.vscode-circuitpython-v2-0.2.8\\boards\\0x239A\\0x80F4",
-        "c:\\Users\\johnw\\.vscode\\extensions\\wmerkens.vscode-circuitpython-v2-0.2.8\\stubs",
-        "c:\\Users\\johnw\\AppData\\Roaming\\Code\\User\\globalStorage\\wmerkens.vscode-circuitpython-v2\\bundle\\20241128\\adafruit-circuitpython-bundle-py-20241128\\lib"
+        "${userHome}/.vscode/extensions/wmerkens.vscode-circuitpython-v2-0.2.8/boards/0x239A/0x80F4",
+        "${userHome}/.vscode/extensions/wmerkens.vscode-circuitpython-v2-0.2.8/stubs",
+        "${userHome}/AppData/Roaming/Code/User/globalStorage/wmerkens.vscode-circuitpython-v2/bundle/20241217/adafruit-circuitpython-bundle-py-20241217/lib",
+        "./lib"
     ],
     "python.languageServer": "Pylance",
     "python.analysis.diagnosticSeverityOverrides": {
