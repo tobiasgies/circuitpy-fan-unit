@@ -8,7 +8,8 @@
 1. Connect to USB and boot the Raspberry in UF2 Bootloader v3.0 mode (power on with BOOT button pressed)
 2. Download firmware from [circuitpython.org](https://circuitpython.org/board/raspberry_pi_pico/) for the RPI Pico
 3. Put the `adafruit-circuitpython-raspberry_pi_pico-en_US-*.uf2` (or later) file on the mounted storage.  
-4. Copy `code.py` file and `./lib` folder to the mounted storage
+4. Copy `code.py` file into the root of the mounted drive, replace old file if prompted
+5. Copy `./lib` folder to the mounted storage, replace all if prompted
 
 ______
 
