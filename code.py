@@ -5,9 +5,9 @@ from adafruit_emc2101 import EMC2101
 import digitalio
 import neopixel
 
-MIN_TEMP = 20 # Temperature Boundaries. Closer to this is green. LEDs
-MAX_TEMP = 35 # Temperature Boundaries. Closer to this is red. LEDs
-LEDBRIGHTNESS = 0.6 # Yes, you can change the brightness here
+MIN_TEMP = 25 # Temperature Boundaries. Closer to this is green. LEDs
+MAX_TEMP = 60 # Temperature Boundaries. Closer to this is red. LEDs
+LEDBRIGHTNESS = 0.3 # Yes, you can change the brightness here
 BAUD_RATE = 115200 # The UART connection speed
 TIMEOUT = 0 # Number of time before timeout
 TEMP_OFFSET = 0 # degrees C Correction for internal_temperature to match external_temperature.
@@ -78,10 +78,6 @@ while True:
     
     dataA = UART0.read(8)
     dataB = UART1.read(8)
-    #uart.write(bytes(str("Hello Blade A" + "\n"),'UTF-8'))
-    #uart1.write(bytes(str("Hello Blade B" + "\n"),'UTF-8'))
-    #print (dataA)
-    #print (dataB)
 
     try:
         dataA=int(dataA)
@@ -92,10 +88,6 @@ while True:
     except:        
         dataB = 'Auto'
 
-#     if dataA is not None:
-#         dataA = dataA.decode()
-#     if dataB is not None:
-#         dataB = dataB.decode()
     if BUTTON.value:
         print("Button is not pressed")
         LED.value = False
@@ -112,65 +104,52 @@ while True:
     print("External temperature(Port B):", emc.external_temperature, "C")
     BladeA_uart_info = bytes(str("Internal temperature(Port A): " + str(getInternalWithOffset()) + " C" + "\r\n"),'UTF-8')
     BladeB_uart_info = bytes(str("External temperature(Port B): " + str(emc.external_temperature) + " C" + "\r\n"),'UTF-8')
-    #BladeA_uart_info = bytes(str(str(emc.external_temperature) + " C" + "\r\n"),"ascii")
-    #BladeB_uart_info = bytes(str(str(emc.internal_temperature) + " C" + "\r\n"),"ascii")
-    #print(BladeA_uart_info + BladeB_uart_info)
     fan_speed=bytes(str("Fan speed: " + str(emc.fan_speed) + "RPM" + "\r\n" + "\r\n"),'UTF-8')
     blade_request=bytes(str("Blade A: " + str(dataA) + "%" + "| Blade B: " + str(dataB) + "%" + "\r\n"),'UTF-8')
     UART0.write(BladeA_uart_info + BladeB_uart_info + blade_request + fan_speed)
     UART1.write(BladeA_uart_info + BladeB_uart_info + blade_request + fan_speed)
-    
+
     if dataA is not 'Auto' and dataB is not 'Auto':
-        print("Both blades want to set the temperature")
+        print("Both blades want to set fan speed explicitly, setting to higher requested speed.")
         print("Blade A asks:", dataA, "%")
         print("Blade B asks:", dataB, "%")
         emc.manual_fan_speed = int(max(dataA, dataB))
         print("Fan speed", emc.fan_speed, "RPM or", int(max(dataA, dataB)), "%")
         time.sleep(2)
         print("")
-        continue   
-    if (dataA is not 'Auto' and dataB is 'Auto') or (dataA is 'Auto' and dataB is not 'Auto'):  #xor in a hurry
-        if dataA is not 'Auto':
-            LED.value = True
-            print("Set the speed as Blade A asks:", dataA, " %")
-            emc.manual_fan_speed = int(dataA)
-            time.sleep(1)
-            print("Fan speed", emc.fan_speed, "RPM")
-            time.sleep(1)
-        if dataB is not 'Auto':
-            LED.value = True
-            print("Set the speed as Blade B asks:", dataB, " %")
-            emc.manual_fan_speed = int(dataB)
-            time.sleep(2)
-            print("Fan speed", emc.fan_speed, "RPM")
+    elif dataA is not 'Auto':
+        LED.value = True
+        print("Set the speed as Blade A asks:", dataA, " %")
+        emc.manual_fan_speed = int(dataA)
         time.sleep(2)
-        print("")
-        continue 
-        
+        print("Fan speed", emc.fan_speed, "RPM")
+    elif dataB is not 'Auto':
+        LED.value = True
+        print("Set the speed as Blade B asks:", dataB, " %")
+        emc.manual_fan_speed = int(dataB)
+        time.sleep(2)
+        print("Fan speed", emc.fan_speed, "RPM")
+    # If we don't have a clear fan speed request from either blade, fall through to fan curve based on reported temps.
+    # This fan curve is more geared towards silent operation than the one provided in the ComputeBlade example:
+    # - 100% fan above 50 °C
+    # -  80% fan between 40 and 50 °C
+    # -  60% fan between 35 and 40 °C
+    # -  40% fan between 30 and 35 °C
+    # -  20% fan between 25 and 30 °C
+    # -   0% fan below 25 °C
     else:
-        # If temp exceeds 40C turn fan on 100%
-        if 40 <= emc.external_temperature or 40 <= getInternalWithOffset():
+        if 50 <= emc.external_temperature or 50 <= getInternalWithOffset():
             setFanSpeed(100)
-
-        # If temp between 35C to 40C set fan speed to 70% 
+        elif checkTempInRange(40,50):
+            setFanSpeed(80)
         elif checkTempInRange(35,40):
-            setFanSpeed(70)
-
-        # If temp between 33C to 35C set fan speed to 70% 
-        elif checkTempInRange(33,35):
             setFanSpeed(60)
-
-        # If temp between 13C to 33C set fan speed to 70% 
-        elif checkTempInRange(31,33):
+        elif checkTempInRange(30, 35):
             setFanSpeed(40)
-
-        # If temp between 29C to 31C set fan speed to 70% 
-        elif checkTempInRange(29,31):
-            setFanSpeed(30)
-
-        # If temp lower than 29C set fan speed to 10% 
+        elif checkTempInRange(25, 30):
+            setFanSpeed(20)
         else:
-            setFanSpeed(10)
+            setFanSpeed(0)
 
     print("")
     time.sleep(1)
