@@ -7,7 +7,7 @@ import neopixel
 
 MIN_TEMP = 25 # Temperature Boundaries. Closer to this is green. LEDs
 MAX_TEMP = 60 # Temperature Boundaries. Closer to this is red. LEDs
-LEDBRIGHTNESS = 0.3 # Yes, you can change the brightness here
+LEDBRIGHTNESS = 0.1 # Yes, you can change the brightness here
 BAUD_RATE = 115200 # The UART connection speed
 TIMEOUT = 0 # Number of time before timeout
 TEMP_OFFSET = 0 # degrees C Correction for internal_temperature to match external_temperature.
